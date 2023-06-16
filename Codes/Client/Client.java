@@ -3,10 +3,12 @@ package Client;
 import java.io.*;
 import java.net.Socket;
 import java.util.Scanner;
+import java.util.StringTokenizer;
+import java.util.Vector;
 
 public class Client {
     public static void main(String[] args) throws IOException, ClassNotFoundException {
-        Socket socket = new Socket("localhost", 6666);
+        Socket socket = new Socket("localhost", 6667);
         System.out.println("Connection established");
         System.out.println("Remote port: " + socket.getPort());
         System.out.println("Local port: " + socket.getLocalPort());
@@ -22,10 +24,15 @@ public class Client {
             String textFromServer =  in.readUTF();
             System.out.println("Text from server: "+textFromServer);
             Scanner scanner= new Scanner(System.in);
-            int id= scanner.nextInt();
-            out.writeUTF(""+id);
-
-
+            String username= scanner.next();
+            out.writeUTF(""+username);
+            textFromServer =  in.readUTF();
+            System.out.println("Text from server: "+textFromServer);
+            if(textFromServer.equals("You are already logged in")){
+                System.out.println("login failed. Quitting");
+                socket.close();
+                return;
+            }
 
 
 
@@ -56,7 +63,7 @@ public class Client {
 //                    String msg = dataInputStreamFile.readUTF();
 //                    if(!msg.equals("ACK"))
 //                    {
-//                        System.out.println("Did not receive ACK...");
+//                        System.out.println("Dusername not receive ACK...");
 //                        break;
 //                    }
 //

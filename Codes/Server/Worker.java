@@ -4,23 +4,49 @@ import java.io.*;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.StringTokenizer;
 import java.util.Vector;
 
 public class Worker extends Thread {
-    Socket socket;
-
+    
+    public HashMap<String, Worker> workers;
+    private String username;
+    private int fileCnt;
+    private Socket socket;
+    private DataOutputStream out;
+    private DataInputStream in;
+    private boolean isOnline;
     public Worker(Socket socket)
     {
         this.socket = socket;
+        workers= Server.getWorkers();
+        fileCnt=0;
+        isOnline=false;
+    }
+    public DataOutputStream getDataOutputStream(){
+        return out;
+    }
+    public DataInputStream getDataInputStream(){
+        return in;
     }
 
+    public boolean isOnline() {
+        return isOnline;
+    }
+    public void setOnline(boolean status){
+        isOnline=status;
+    }
+    boolean isAlreadyLoggedIn(String uname){
+        if(workers.containsKey(uname) && workers.get(uname).isOnline()) return true;
+        return false;
+    }
     public void run()
     {
         // buffers
         try {
-            DataOutputStream out = new DataOutputStream(this.socket.getOutputStream());
-            DataInputStream in = new DataInputStream(this.socket.getInputStream());
+            out = new DataOutputStream(this.socket.getOutputStream());
+            in = new DataInputStream(this.socket.getInputStream());
 
             while (true)
             {
@@ -29,13 +55,22 @@ public class Worker extends Thread {
 //                out.writeObject(date.toString());
 
 
-                out.writeUTF("Give your ID");
+                out.writeUTF("Give your username");
                 String textFromClient = in.readUTF();
-                System.out.println("Client ID: "+textFromClient);
-                int clientId = Integer.parseInt(textFromClient);
-                new File("Codes/Server/files/"+clientId+"/public").mkdirs();
-                new File("Codes/Server/files/"+clientId+"/private").mkdirs();
-                textFromClient = in.readUTF();
+                System.out.println("Client username: "+textFromClient);
+                String username = textFromClient;
+                if(!isAlreadyLoggedIn(username)) {
+                  //  Worker user = new Worker(username, socket);
+                    this.username= username;
+                    this.isOnline=true;
+                    workers.put(username, this);
+                    out.writeUTF("Username: "+username+" login successful");
+                    System.out.println("Username: "+username+" login successful");
+
+                    new File("Codes/Server/files/" + username + "/public").mkdirs();
+                    new File("Codes/Server/files/" + username + "/private").mkdirs();
+                    textFromClient = in.readUTF();
+
                 System.out.println("Text from client (File) "+textFromClient);
 
                 StringTokenizer stringTokenizer = new StringTokenizer(textFromClient," ");
@@ -61,10 +96,10 @@ public class Worker extends Thread {
                     try
                     {
 //                        connectionSocketFile.setSoTimeout(5000);
-//                        boolean ok = recieveFile(fileName,fileType,filesize,curUser.getId(),disFile,dosFile,CHUNK_SIZE);
+//                        boolean ok = recieveFile(fileName,fileType,filesize,curWorker.getId(),disFile,dosFile,CHUNK_SIZE);
 //                        connectionSocketFile.setSoTimeout(0);
                         int bytes = 0;
-                        FileOutputStream fileOutputStream = new FileOutputStream("Codes/Server/files/"+clientId+"/public/"+fileName);
+                        FileOutputStream fileOutputStream = new FileOutputStream("Codes/Server/files/"+username+"/public/"+fileName);
 
                         try{
                             int size = Integer.parseInt(tokens.elementAt(2));     // read file size
@@ -158,6 +193,14 @@ public class Worker extends Thread {
                 }
                 //-------------- receive file finished
             }
+                else {
+                    out.writeUTF("You are already logged in");
+                    out.writeUTF("Username: "+username+" login failed");
+                    Thread.currentThread().interrupt(); // preserve the message
+                    socket.close();
+                    return;
+                }
+                }
         } catch (IOException | InterruptedException e) {
             e.printStackTrace();
         }
