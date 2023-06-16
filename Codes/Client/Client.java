@@ -2,6 +2,7 @@ package Client;
 
 import java.io.*;
 import java.net.Socket;
+import java.util.Scanner;
 
 public class Client {
     public static void main(String[] args) throws IOException, ClassNotFoundException {
@@ -18,6 +19,16 @@ public class Client {
         while(true) {
 //            String msg = (String) in.readObject();
 //            System.out.println(msg);
+            String textFromServer =  in.readUTF();
+            System.out.println("Text from server: "+textFromServer);
+            Scanner scanner= new Scanner(System.in);
+            int id= scanner.nextInt();
+            out.writeUTF(""+id);
+
+
+
+
+
             //sending file
             File file = new File("Codes/Client/abcd.txt");
             FileInputStream fileInputStream = new FileInputStream(file);

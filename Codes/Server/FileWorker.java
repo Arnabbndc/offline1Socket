@@ -7,10 +7,10 @@ import java.util.Date;
 import java.util.StringTokenizer;
 import java.util.Vector;
 
-public class Worker extends Thread {
+public class FileWorker extends Thread {
     Socket socket;
 
-    public Worker(Socket socket)
+    public FileWorker(Socket socket)
     {
         this.socket = socket;
     }
@@ -19,23 +19,15 @@ public class Worker extends Thread {
     {
         // buffers
         try {
-            DataOutputStream out = new DataOutputStream(this.socket.getOutputStream());
-            DataInputStream in = new DataInputStream(this.socket.getInputStream());
+            DataOutputStream fileOut = new DataOutputStream(this.socket.getOutputStream());
+            DataInputStream fileIn= new DataInputStream(this.socket.getInputStream());
 
             while (true)
             {
                 Thread.sleep(1);
 //                Date date = new Date();
-//                out.writeObject(date.toString());
-
-
-                out.writeUTF("Give your ID");
-                String textFromClient = in.readUTF();
-                System.out.println("Client ID: "+textFromClient);
-                int clientId = Integer.parseInt(textFromClient);
-                new File("Codes/Server/files/"+clientId+"/public").mkdirs();
-                new File("Codes/Server/files/"+clientId+"/private").mkdirs();
-                textFromClient = in.readUTF();
+//                fileOut.writeObject(date.toString());
+                String textFromClient = fileIn.readUTF();
                 System.out.println("Text from client (File) "+textFromClient);
 
                 StringTokenizer stringTokenizer = new StringTokenizer(textFromClient," ");
@@ -64,7 +56,7 @@ public class Worker extends Thread {
 //                        boolean ok = recieveFile(fileName,fileType,filesize,curUser.getId(),disFile,dosFile,CHUNK_SIZE);
 //                        connectionSocketFile.setSoTimeout(0);
                         int bytes = 0;
-                        FileOutputStream fileOutputStream = new FileOutputStream("Codes/Server/files/"+clientId+"/public/"+fileName);
+                        FileOutputStream fileOutputStream = new FileOutputStream("Codes/Server/server "+fileName);
 
                         try{
                             int size = Integer.parseInt(tokens.elementAt(2));     // read file size
@@ -76,7 +68,7 @@ public class Worker extends Thread {
 
                                 boolean ok;
                                 try {
-                                    ok = (bytes = in.read(buffer, 0, Math.min(buffer.length, size))) != -1;
+                                    ok = (bytes = fileIn.read(buffer, 0, Math.min(buffer.length, size))) != -1;
                                 }catch (SocketTimeoutException socketTimeoutException){
 //                                    CUR_BUFFER_SIZE -= CHUNK_SIZE;
                                     fileOutputStream.close();
@@ -95,8 +87,8 @@ public class Worker extends Thread {
                                 size -= bytes;      // read upto file size
                                 // send ACK
 //            if(CHUNK <= 1) { // hardcode timeout
-//                                out.writeUTF("ACK");
-//                                out.flush();
+//                                fileOut.writeUTF("ACK");
+//                                fileOut.flush();
 //            }
 
                             }
@@ -114,7 +106,7 @@ public class Worker extends Thread {
                         }
 
                         // check confirmation and validate file size
-                        String msg = in.readUTF();
+                        String msg = fileIn.readUTF();
                         if(msg.equals("ACK")){
 //                            File file = new File("server "+fileName);
 //                            if(file.length() != filesize)
@@ -135,14 +127,14 @@ public class Worker extends Thread {
 //
 //                        if(ok)
 //                        {
-                            out.writeUTF("ACK");
+                            fileOut.writeUTF("ACK");
                             System.out.println("File Upload Completed");
                         }
 //                        else
 //                        {
 //                            File file = new File("files/"+out.getId()+"/"+fileType+"/"+fileName);
 //                            System.out.println(file.delete());
-//                            out.writeUTF("NOT_ACK");
+//                            fileOut.writeUTF("NOT_ACK");
 //                            System.out.println("File Upload Failed");
 //                        }
 
@@ -151,7 +143,7 @@ public class Worker extends Thread {
                     {
 //                        File file = new File("files/"+out.getId()+"/"+fileType+"/"+fileName);
 //                        System.out.println(file.delete());
-                        out.writeUTF("File Deleted");
+                        fileOut.writeUTF("File Deleted");
                         System.err.println("Could not transfer file.");
                     }
 
