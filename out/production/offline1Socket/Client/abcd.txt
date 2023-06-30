@@ -23,6 +23,7 @@ d. Make a file request, consisting of a short file description and a request id,
 which will be broadcast to all the connected clients.
 e. View all his/her unread messages.
 f. Upload a file:
+
 i. The file access can only be private or public. It will be specified by
 the uploader at time of upload.
 ii. If the file is uploaded in response to a request, it must be public and
