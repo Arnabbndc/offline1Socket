@@ -2,9 +2,11 @@ package Client;
 
 import java.io.*;
 import java.net.Socket;
+import java.util.List;
 import java.util.Scanner;
 import java.util.StringTokenizer;
 import java.util.Vector;
+import Server.Pair;
 
 public class Client {
     public static void main(String[] args) throws IOException, ClassNotFoundException {
@@ -45,7 +47,21 @@ public class Client {
 //                socket.close();
 //                return;
 //            }
-
+            System.out.println("Console ...");
+            System.out.println("Choose an option between 1-6");
+            System.out.println("1. Lookup all clients");
+            System.out.println("2. Lookup all your files");
+            System.out.println("3. Lookup all public files");
+            System.out.println("4. Request a file");
+            System.out.println("5. View unread messages");
+            System.out.println("6. File upload");
+            int option = scanner.nextInt();
+            out.writeUTF(""+option);
+            if(option==1){
+                //List<Pair> clients =(List<Pair>) in.;
+                String info= in.readUTF();
+                System.out.println("From Server....\n"+info);
+            }
 
 
             //sending file

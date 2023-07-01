@@ -31,6 +31,10 @@ public class Worker extends Thread {
         return in;
     }
 
+    public String getUsername() {
+        return username;
+    }
+
     public boolean isOnline() {
         return isOnline;
     }
@@ -40,6 +44,16 @@ public class Worker extends Thread {
     boolean isAlreadyLoggedIn(String uname){
         if(workers.containsKey(uname) && workers.get(uname).isOnline()) return true;
         return false;
+    }
+    public void sendUserList() throws IOException {
+        String info = "Users: \n";
+        for (String key : workers.keySet()) {
+            Worker worker = workers.get(key);
+            info+="Username:  "+worker.getUsername()+" Online: "+worker.isOnline+"\n";
+        }
+        info+="\n";
+        out.writeUTF(info);
+
     }
     public void run()
     {
@@ -53,24 +67,22 @@ public class Worker extends Thread {
             System.out.println("Client username: " + textFromClient);
             String username = textFromClient;
             if (!isAlreadyLoggedIn(username)) {
+                this.username = username;
+                this.isOnline = true;
+                workers.put(username, this);
+                out.writeUTF("Username: " + username + " login successful");
+                System.out.println("Username: " + username + " login successful");
+                new File("Codes/Server/files/" + username + "/public").mkdirs();
+                new File("Codes/Server/files/" + username + "/private").mkdirs();
                 while (true) {
                     Thread.sleep(1);
 //                Date date = new Date();
 //                out.writeObject(date.toString());
-
-
                     //  Worker user = new Worker(username, socket);
-                    this.username = username;
-                    this.isOnline = true;
-                    workers.put(username, this);
-                    out.writeUTF("Username: " + username + " login successful");
-                    System.out.println("Username: " + username + " login successful");
 
-                    new File("Codes/Server/files/" + username + "/public").mkdirs();
-                    new File("Codes/Server/files/" + username + "/private").mkdirs();
                     textFromClient = in.readUTF();
 
-                    System.out.println("Text from client (File) " + textFromClient);
+                    System.out.println("Text from client " + textFromClient);
 
                     StringTokenizer stringTokenizer = new StringTokenizer(textFromClient, " ");
                     Vector<String> tokens = new Vector<>();
@@ -79,9 +91,11 @@ public class Worker extends Thread {
                         tokens.add(stringTokenizer.nextToken());
                     }
 
-
+                    if(tokens.elementAt(0).equals("1")) {
+                        sendUserList();
+                    }
                     //-----------receive file-------------------
-                    if (tokens.elementAt(0).equals("fileName")) {
+                   else if (tokens.elementAt(0).equals("fileName")) {
                         System.out.println("fileName : " + tokens.elementAt(1));
 //                    int filesize = Integer.parseInt(tokens.elementAt(1));
                         String fileName = tokens.elementAt(1);
