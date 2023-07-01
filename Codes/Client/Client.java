@@ -56,7 +56,8 @@ public class Client {
             System.out.println("5. View unread messages");
             System.out.println("6. File upload");
             int option = scanner.nextInt();
-            out.writeUTF(""+option);
+            if(option<4)
+                out.writeUTF(""+option);
             if(option<3){
                 //List<Pair> clients =(List<Pair>) in.;
                 String info= in.readUTF();
@@ -72,12 +73,24 @@ public class Client {
 
             //sending file
             else if(option==6) {
-                File file = new File("Codes/Client/abcd.txt");
+                System.out.println("1. Public\n2. Private");
+                int choice= scanner.nextInt();
+                System.out.println("File Name:");
+                String fileName;
+               // fileName= scanner.nextLine();
+                fileName= "abcd.txt";//temporary
+                File file = new File("Codes/Client/"+fileName);
+                if(!file.exists()){
+                    System.out.println("File \""+fileName+"\" does not exist");
+                    continue;
+                }
+                out.writeUTF(""+option);
+                out.writeUTF(""+choice);
+                out.writeUTF(fileName);
+                out.writeUTF(""+file.length());
                 FileInputStream fileInputStream = new FileInputStream(file);
 
 //            long fileLength = file.length();
-
-                out.writeUTF("fileName " + "abcd.txt" + " " + file.length());
                 System.out.println("fileName " + "abcd.txt" + " " + file.length());
                 out.flush();
 

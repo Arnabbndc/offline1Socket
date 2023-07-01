@@ -109,29 +109,34 @@ public class Worker extends Thread {
                     textFromClient = in.readUTF();
 
                     System.out.println("Text from client " + textFromClient);
+//
+//                    StringTokenizer stringTokenizer = new StringTokenizer(textFromClient, " ");
+//                    Vector<String> tokens = new Vector<>();
+//
+//                    while (stringTokenizer.hasMoreTokens()) {
+//                        tokens.add(stringTokenizer.nextToken());
+//                    }
 
-                    StringTokenizer stringTokenizer = new StringTokenizer(textFromClient, " ");
-                    Vector<String> tokens = new Vector<>();
-
-                    while (stringTokenizer.hasMoreTokens()) {
-                        tokens.add(stringTokenizer.nextToken());
-                    }
-
-                    if(tokens.elementAt(0).equals("1")) {
+                    if(textFromClient.equals("1")) {
                         sendUserList();
                     }
-                    else if(tokens.elementAt(0).equals("2")) {
+                    else if(textFromClient.equals("2")) {
                         lookupFiles(this.username);
                     }
-                    else if(tokens.elementAt(0).equals("3")) {
+                    else if(textFromClient.equals("3")) {
                         String uname= in.readUTF();
                         lookupFiles(uname);
                     }
                     //-----------receive file-------------------
-                   else if (tokens.elementAt(0).equals("fileName")) {
-                        System.out.println("fileName : " + tokens.elementAt(1));
-//                    int filesize = Integer.parseInt(tokens.elementAt(1));
-                        String fileName = tokens.elementAt(1);
+                   else if (textFromClient.equals("6")) {
+                        String choice= in.readUTF();
+                        if(choice.equals("1"))choice="public";
+                        else choice="private";
+                        String fileName= in.readUTF();
+                        int size= Integer.parseInt(in.readUTF());
+                        System.out.println("User \""+username+"\" wants to upload file \""+fileName+"\" as a "+choice+" file having file length "+size);
+                        // int filesize = Integer.parseInt(tokens.elementAt(1));
+
 //                    String fileType = tokens.elementAt(3);
 //                    int CHUNK_SIZE = Integer.parseInt(tokens.elementAt(4));
 
@@ -140,11 +145,9 @@ public class Worker extends Thread {
 //                        boolean ok = recieveFile(fileName,fileType,filesize,curWorker.getId(),disFile,dosFile,CHUNK_SIZE);
 //                        connectionSocketFile.setSoTimeout(0);
                             int bytes = 0;
-                            FileOutputStream fileOutputStream = new FileOutputStream("Codes/Server/files/" + username + "/public/" + fileName);
+                            FileOutputStream fileOutputStream = new FileOutputStream("Codes/Server/files/" + username + "/"+choice+"/" + fileName);
 
-                            try {
-                                int size = Integer.parseInt(tokens.elementAt(2));     // read file size
-                                byte[] buffer = new byte[512];
+                            try { byte[] buffer = new byte[512];
                                 int CHUNK = 0;
                                 // extra
 //                            CUR_BUFFER_SIZE += CHUNK_SIZE;
