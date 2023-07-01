@@ -51,40 +51,47 @@ public class Client {
             System.out.println("Choose an option between 1-6");
             System.out.println("1. Lookup all clients");
             System.out.println("2. Lookup all your files");
-            System.out.println("3. Lookup all public files");
+            System.out.println("3. Lookup all public files of a user");
             System.out.println("4. Request a file");
             System.out.println("5. View unread messages");
             System.out.println("6. File upload");
             int option = scanner.nextInt();
             out.writeUTF(""+option);
-            if(option==1){
+            if(option<3){
                 //List<Pair> clients =(List<Pair>) in.;
                 String info= in.readUTF();
                 System.out.println("From Server....\n"+info);
             }
-
+            else if(option==3){
+                System.out.println("Enter the username whose public files you want to see:");
+                String uname=  scanner.next();
+                out.writeUTF(uname);
+                String info= in.readUTF();
+                System.out.println("From Server....\n"+info);
+            }
 
             //sending file
-            File file = new File("Codes/Client/abcd.txt");
-            FileInputStream fileInputStream = new FileInputStream(file);
+            else if(option==6) {
+                File file = new File("Codes/Client/abcd.txt");
+                FileInputStream fileInputStream = new FileInputStream(file);
 
 //            long fileLength = file.length();
 
-            out.writeUTF("fileName "+ "abcd.txt"+" "+file.length());
-            System.out.println("fileName "+  "abcd.txt"+" "+file.length());
-            out.flush();
+                out.writeUTF("fileName " + "abcd.txt" + " " + file.length());
+                System.out.println("fileName " + "abcd.txt" + " " + file.length());
+                out.flush();
 
-            // break file into chunks
-            int bytes = 0;
-            byte[] buffer = new byte[512];
-            int CHUNK = 0;
-            while ((bytes=fileInputStream.read(buffer))!=-1){
+                // break file into chunks
+                int bytes = 0;
+                byte[] buffer = new byte[512];
+                int CHUNK = 0;
+                while ((bytes = fileInputStream.read(buffer)) != -1) {
 
 //            if(CHUNK % 10000 == 0) System.out.println("Chunk #"+CHUNK);
-                CHUNK++;
+                    CHUNK++;
 
-                out.write(buffer,0,bytes);
-                out.flush();
+                    out.write(buffer, 0, bytes);
+                    out.flush();
 
 //                try {
 //                    // ACK
@@ -102,17 +109,19 @@ public class Client {
 //                    fileInputStream.close();
 //                    return;
 //                }
+                }
+                fileInputStream.close();
+
+                // send confirmation
+                out.writeUTF("ACK");
+                out.flush();
+
+                String msg = in.readUTF();
+                if (msg.equals("ACK")) {
+                    System.out.println("File Upload Completed");
+
+                } else System.out.println("File Upload Failed");
             }
-            fileInputStream.close();
-
-            // send confirmation
-            out.writeUTF("ACK");
-            out.flush();
-
-            String msg = in.readUTF();
-            if(msg.equals("ACK")) {System.out.println("File Upload Completed");
-                return;}
-            else System.out.println("File Upload Failed");
 
         }
     }

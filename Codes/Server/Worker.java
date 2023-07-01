@@ -55,6 +55,32 @@ public class Worker extends Thread {
         out.writeUTF(info);
 
     }
+    public void lookupFiles(String username ) throws IOException {
+        File directory = new File("Codes/Server/files/" + username + "/public");
+        String []files = directory.list();
+        String info = "Public files of user \""+username+"\".... \n";
+        for(String s: files){
+            info+="\t"+s+"\n";
+        }
+        info+="\n";
+        if(username.equalsIgnoreCase(this.username)){
+            directory= new File("Codes/Server/files/" + username + "/private");
+            files = directory.list();
+            info+= "Private files of user \""+username+"\".... \n";
+            for(String s: files){
+                info+="\t"+s+"\n";
+            }
+            info+="\n";
+        }
+        out.writeUTF(info);
+    }
+
+//    public String[] lookupPrivateFiles(int uID){
+//        File directoryPath = new File("files/"+uID+"/private");
+//        //List of all files and directories
+//        String contents[] = directoryPath.list();
+//        return contents;
+//    }
     public void run()
     {
         // buffers
@@ -93,6 +119,13 @@ public class Worker extends Thread {
 
                     if(tokens.elementAt(0).equals("1")) {
                         sendUserList();
+                    }
+                    else if(tokens.elementAt(0).equals("2")) {
+                        lookupFiles(this.username);
+                    }
+                    else if(tokens.elementAt(0).equals("3")) {
+                        String uname= in.readUTF();
+                        lookupFiles(uname);
                     }
                     //-----------receive file-------------------
                    else if (tokens.elementAt(0).equals("fileName")) {
@@ -180,9 +213,9 @@ public class Worker extends Thread {
                                 out.writeUTF("ACK");
                                 System.out.println("File Upload Completed");
                                 // temporary
-                                Thread.currentThread().interrupt(); // preserve the message
-                                socket.close();
-                                return;
+//                                Thread.currentThread().interrupt(); // preserve the message
+//                                socket.close();
+//                                return;
                             }
 //                        else
 //                        {
