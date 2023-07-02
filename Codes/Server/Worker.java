@@ -87,8 +87,10 @@ public class Worker extends Thread {
     }
     public void lookupFiles(String username ) throws IOException {
         File directory = new File("Codes/Server/files/" + username + "/public");
+
         String []files = directory.list();
         String info = "Public files of user \""+username+"\".... \n";
+
         for(String s: files){
             info+="\t"+s+"\n";
         }
@@ -120,6 +122,26 @@ public class Worker extends Thread {
         if(!Server.fileIds.containsKey(name))
             Server.fileIds.put(name,Server.fileIds.size()+1);
         return Server.fileIds.get(name);
+    }
+    public static void sendFile( File file, DataInputStream in, DataOutputStream out) throws IOException {
+        out.writeUTF(""+Server.MAX_CHUNK_SIZE);
+        out.writeUTF(""+file.length());
+        FileInputStream fileInputStream = new FileInputStream(file);
+        out.flush();
+        String fileName= file.getName();
+        System.out.println("fileName " + fileName + " " + file.length());
+
+        int bytes = 0;
+        byte[] buffer = new byte[Server.MAX_CHUNK_SIZE];
+        while ((bytes = fileInputStream.read(buffer)) != -1) {
+            out.write(buffer, 0, bytes);
+            out.flush();
+        }
+        fileInputStream.close();
+        out.writeUTF("Complete");
+        out.flush();
+        System.out.println("File Download Completed");
+
     }
     public void run()
     {
@@ -168,10 +190,38 @@ public class Worker extends Thread {
                     }
                     else if(textFromClient.equals("2")) {
                         lookupFiles(this.username);
+                        if(in.readUTF().equals("2"))continue;
+                        String fileName = in.readUTF();
+                        File file= new File("Codes/Server/files/" + username + "/public/"+fileName);
+                        if(!file.exists()) file= new File("Codes/Server/files/" + username + "/private/"+fileName);
+                        if(!file.exists()) {
+                            out.writeUTF("Wrong file");
+                            System.out.println("No such file \""+fileName+"\" exists\nDownloading failed..");
+                            continue;
+                        }
+                        else{
+                            out.writeUTF("Valid file");
+                            System.out.println("File "+fileName+" is going to be downloaded by user "+username);
+                            sendFile(file, in, out);
+                        }
                     }
                     else if(textFromClient.equals("3")) {
                         String uname= in.readUTF();
                         lookupFiles(uname);
+                        if(in.readUTF().equals("2"))continue;
+                        String fileName = in.readUTF();
+                        File file= new File("Codes/Server/files/" + uname + "/public/"+fileName);
+                        if(!file.exists()) {
+                            out.writeUTF("Wrong file");
+                            System.out.println("No such file \""+fileName+"\" exists\nDownloading failed..");
+                            continue;
+                        }
+                        else{
+                            out.writeUTF("Valid file");
+                            System.out.println("File "+fileName+" is going to be downloaded by user "+username);
+                            sendFile(file, in, out);
+                        }
+
                     }
                     //-----------receive file-------------
 
@@ -219,7 +269,7 @@ public class Worker extends Thread {
 
 //                                if(!ok) break;
 
-                                        if (CHUNK % 10 == 0) System.out.println("Chunk #" + CHUNK);
+                                        if (CHUNK % 10000 == 0) System.out.println("Chunk #" + CHUNK);
                                         CHUNK++;
 
 //            if(CHUNK != 1) // hardcode to check file size difference

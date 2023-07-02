@@ -11,8 +11,8 @@ import java.util.HashMap;
 public class Server {
 
     public static long MAX_BUFFER_SIZE = 100000 * 1024; // byte
-    public static long MIN_CHUNK_SIZE = 5; // kilobyte
-    public static long MAX_CHUNK_SIZE = 500; // kilobyte
+    public static int MIN_CHUNK_SIZE = 5; // kilobyte
+    public static int MAX_CHUNK_SIZE = 500; // kilobyte
     public static volatile long CUR_BUFFER_SIZE = 0;
     private static HashMap<String, Worker> workers= new HashMap<>();
     public static HashMap<String,Worker> getWorkers(){

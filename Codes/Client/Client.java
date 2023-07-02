@@ -8,8 +8,27 @@ import java.util.Scanner;
 import java.util.StringTokenizer;
 import java.util.Vector;
 import Server.Pair;
+import Server.Server;
 
 public class Client {
+
+    public static void receiveFile(String username, String fileName, DataInputStream in, DataOutputStream out) throws IOException {
+                int bytes = 0;
+                FileOutputStream fileOutputStream = new FileOutputStream("Codes/Client/Downloads/" + username + "/" + fileName);
+                int chunkSize= Integer.parseInt(in.readUTF());
+                int size= Integer.parseInt(in.readUTF());
+                    byte[] buffer = new byte[chunkSize];
+                    while (size > 0) {
+                        bytes = in.read(buffer, 0, Math.min(buffer.length, size)) ;
+                        fileOutputStream.write(buffer, 0, bytes);
+                        size -= bytes;
+                    }
+                String msg = in.readUTF();
+                if (msg.equals("Complete")) {
+                    System.out.println("File Downloading Completed");
+                }
+
+    }
     public static void main(String[] args) throws IOException, ClassNotFoundException {
         Socket socket = new Socket("localhost", 6667);
         System.out.println("Connection established");
@@ -32,6 +51,9 @@ public class Client {
             socket.close();
             return;
         }
+        new File("Codes/Client/Downloads/"+username).mkdirs();
+
+        
         //
         while(true) {
 //            String msg = (String) in.readObject();
@@ -64,6 +86,21 @@ public class Client {
                 //List<Pair> clients =(List<Pair>) in.;
                 String info= in.readUTF();
                 System.out.println("From Server....\n"+info);
+                if(option==2){
+                    System.out.println("Want to download file from here?\n1. Yes\n2. No");
+                    int choice= scanner.nextInt();
+                    out.writeUTF(""+choice);
+                    if(choice==2)continue;
+                    System.out.println("Enter file name...");
+                    String fileName = scanner.next();
+                    out.writeUTF(fileName);
+                    if(in.readUTF().equalsIgnoreCase("Wrong file")){
+                        System.out.println("No such file exists");
+                        continue;
+                    }
+                    System.out.println("File "+fileName+" download starts..");
+                    receiveFile(username, fileName,in, out);
+                }
             }
             else if(option==3){
                 System.out.println("Enter the username whose public files you want to see:");
@@ -71,17 +108,30 @@ public class Client {
                 out.writeUTF(uname);
                 String info= in.readUTF();
                 System.out.println("From Server....\n"+info);
+                System.out.println("Want to download?\n1. Yes\n2. No");
+                int choice= scanner.nextInt();
+                out.writeUTF(""+choice);
+                if(choice==2)continue;
+                System.out.println("Enter file name...");
+                String fileName = scanner.next();
+                out.writeUTF(fileName);
+                if(in.readUTF().equalsIgnoreCase("Wrong file")){
+                    System.out.println("No such file exists");
+                    continue;
+                }
+                System.out.println("File "+fileName+" from user "+uname+" download starts..");
+                receiveFile(username, fileName,in, out);
             }
 
             //sending file
             else if(option==6) {
                 System.out.println("1. Public\n2. Private");
                 int fileVisibility= scanner.nextInt();
-                System.out.println("File Name:");
+                System.out.println("Enter File Name:");
                 String fileName;
-               // fileName= scanner.nextLine();
-                fileName= "abcd.txt";//temporary
-                File file = new File("Codes/Client/"+fileName);
+               fileName= scanner.next();
+//                fileName= "abcd.txt";//temporary
+                File file = new File("Codes/Client/files/"+fileName);
                 if(!file.exists()){
                     System.out.println("File \""+fileName+"\" does not exist");
                     continue;
@@ -94,7 +144,7 @@ public class Client {
                 out.flush();
 
 //            long fileLength = file.length();
-                System.out.println("fileName " + "abcd.txt" + " " + file.length());
+                System.out.println("fileName " + fileName + " " + file.length());
                 textFromServer= in.readUTF();
                 if(textFromServer.equals("Not Ok")){
                     System.out.println("file can't be uploaded for buffer size issue");
@@ -109,7 +159,7 @@ public class Client {
                 int CHUNK = 0;
                 while ((bytes = fileInputStream.read(buffer)) != -1) {
 
-            if(CHUNK % 10 == 0) System.out.println("Chunk #"+CHUNK);
+            if(CHUNK % 10000 == 0) System.out.println("Chunk #"+CHUNK);
                     CHUNK++;
 
                     out.write(buffer, 0, bytes);
