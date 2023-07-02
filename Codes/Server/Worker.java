@@ -3,10 +3,7 @@ package Server;
 import java.io.*;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
-import java.util.Date;
 import java.util.HashMap;
-import java.util.StringTokenizer;
-import java.util.Vector;
 
 public class Worker extends Thread {
     
@@ -17,6 +14,9 @@ public class Worker extends Thread {
     private DataOutputStream out;
     private DataInputStream in;
     private boolean isOnline;
+
+
+
     public Worker(Socket socket)
     {
         this.socket = socket;
@@ -41,15 +41,44 @@ public class Worker extends Thread {
     public void setOnline(boolean status){
         isOnline=status;
     }
-    boolean isAlreadyLoggedIn(String uname){
-        if(workers.containsKey(uname) && workers.get(uname).isOnline()) return true;
+    public void setWorkers(HashMap<String, Worker> workers) {
+        this.workers = workers;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public void setFileCnt(int fileCnt) {
+        this.fileCnt = fileCnt;
+    }
+
+    public void setSocket(Socket socket) {
+        this.socket = socket;
+    }
+
+    public void setOut(DataOutputStream out) {
+        this.out = out;
+    }
+
+    public void setIn(DataInputStream in) {
+        this.in = in;
+    }
+    boolean isLoggedIn(String uname){
+        if(workers.containsKey(uname)&& workers.get(uname).isOnline() ) return true;
+        return false;
+    }
+    boolean isPreviousUser(String uname){
+        if(workers.containsKey(uname)){
+            return true;
+        }
         return false;
     }
     public void sendUserList() throws IOException {
         String info = "Users: \n";
         for (String key : workers.keySet()) {
             Worker worker = workers.get(key);
-            info+="Username:  "+worker.getUsername()+" Online: "+worker.isOnline+"\n";
+            info+="Username:  "+worker.getUsername()+" | isOnline: "+worker.isOnline+"\n";
         }
         info+="\n";
         out.writeUTF(info);
@@ -92,14 +121,20 @@ public class Worker extends Thread {
             String textFromClient = in.readUTF();
             System.out.println("Client username: " + textFromClient);
             String username = textFromClient;
-            if (!isAlreadyLoggedIn(username)) {
+            if (!isLoggedIn(username)) {
                 this.username = username;
                 this.isOnline = true;
-                workers.put(username, this);
                 out.writeUTF("Username: " + username + " login successful");
                 System.out.println("Username: " + username + " login successful");
-                new File("Codes/Server/files/" + username + "/public").mkdirs();
-                new File("Codes/Server/files/" + username + "/private").mkdirs();
+                if(!isPreviousUser(username)) {
+
+                    new File("Codes/Server/files/" + username + "/public").mkdirs();
+                    new File("Codes/Server/files/" + username + "/private").mkdirs();
+                }
+//                else{
+//                    workers.get(username).setOnline(true);
+//                }
+                workers.put(username, this);
                 while (true) {
                     Thread.sleep(1);
 //                Date date = new Date();
@@ -108,7 +143,7 @@ public class Worker extends Thread {
 
                     textFromClient = in.readUTF();
 
-                    System.out.println("Text from client " + textFromClient);
+                    System.out.println("Option selected by user \""+username+"\": " + textFromClient);
 //
 //                    StringTokenizer stringTokenizer = new StringTokenizer(textFromClient, " ");
 //                    Vector<String> tokens = new Vector<>();
@@ -127,7 +162,9 @@ public class Worker extends Thread {
                         String uname= in.readUTF();
                         lookupFiles(uname);
                     }
-                    //-----------receive file-------------------
+                    //-----------receive file-------------out.writeUTF(""+choice);
+                    //                out.writeUTF(fileName);
+                    //                out.writeUTF(""+file.length());------
                    else if (textFromClient.equals("6")) {
                         String choice= in.readUTF();
                         if(choice.equals("1"))choice="public";
@@ -237,6 +274,13 @@ public class Worker extends Thread {
 
                     }
                     //-------------- receive file finished
+                    else if(textFromClient.equals("7")){
+                        System.out.println("Username: " + username + " is logging out");
+                        this.isOnline=false;
+                        Thread.currentThread().interrupt(); // preserve the message
+                        socket.close();
+                        return;
+                    }
 
                 }
             } else {

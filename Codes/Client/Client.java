@@ -55,8 +55,9 @@ public class Client {
             System.out.println("4. Request a file");
             System.out.println("5. View unread messages");
             System.out.println("6. File upload");
+            System.out.println("7. Logout");
             int option = scanner.nextInt();
-            if(option<4)
+            if(option<4 || option==7)
                 out.writeUTF(""+option);
             if(option<3){
                 //List<Pair> clients =(List<Pair>) in.;
@@ -134,6 +135,11 @@ public class Client {
                     System.out.println("File Upload Completed");
 
                 } else System.out.println("File Upload Failed");
+            }
+            else if(option==7){
+                System.out.println("Logging out. All your data will be saved...");
+                socket.close();
+                return;
             }
 
         }
