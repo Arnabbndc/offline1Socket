@@ -2,6 +2,7 @@ package Client;
 
 import java.io.*;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.util.List;
 import java.util.Scanner;
 import java.util.StringTokenizer;
@@ -75,7 +76,7 @@ public class Client {
             //sending file
             else if(option==6) {
                 System.out.println("1. Public\n2. Private");
-                int choice= scanner.nextInt();
+                int fileVisibility= scanner.nextInt();
                 System.out.println("File Name:");
                 String fileName;
                // fileName= scanner.nextLine();
@@ -86,43 +87,50 @@ public class Client {
                     continue;
                 }
                 out.writeUTF(""+option);
-                out.writeUTF(""+choice);
+                out.writeUTF(""+fileVisibility);
                 out.writeUTF(fileName);
                 out.writeUTF(""+file.length());
                 FileInputStream fileInputStream = new FileInputStream(file);
+                out.flush();
 
 //            long fileLength = file.length();
                 System.out.println("fileName " + "abcd.txt" + " " + file.length());
-                out.flush();
-
+                textFromServer= in.readUTF();
+                if(textFromServer.equals("Not Ok")){
+                    System.out.println("file can't be uploaded for buffer size issue");
+                    continue;
+                }
+                int chunkSize= Integer.parseInt(textFromServer);
+                int fileId = Integer.parseInt(in.readUTF());
+                System.out.println("From server-- Chunk size: "+chunkSize+" FileId: "+fileId);
                 // break file into chunks
                 int bytes = 0;
-                byte[] buffer = new byte[512];
+                byte[] buffer = new byte[chunkSize];
                 int CHUNK = 0;
                 while ((bytes = fileInputStream.read(buffer)) != -1) {
 
-//            if(CHUNK % 10000 == 0) System.out.println("Chunk #"+CHUNK);
+            if(CHUNK % 10 == 0) System.out.println("Chunk #"+CHUNK);
                     CHUNK++;
 
                     out.write(buffer, 0, bytes);
                     out.flush();
 
-//                try {
-//                    // ACK
-//                    String msg = dataInputStreamFile.readUTF();
-//                    if(!msg.equals("ACK"))
-//                    {
-//                        System.out.println("Dusername not receive ACK...");
-//                        break;
-//                    }
-//
-//                }catch (SocketTimeoutException socketTimeoutException){
-//                    System.out.println("TIMEOUT");
-//                    out.writeUTF("TIMEOUT "+fileType+" "+fileName);
-//                    out.flush();
-//                    fileInputStream.close();
-//                    return;
-//                }
+                try {
+                    // ACK
+                    String msg = in.readUTF();
+                    if(!msg.equals("ACK"))
+                    {
+                        System.out.println("Not received ACK...");
+                        break;
+                    }
+
+                }catch (SocketTimeoutException socketTimeoutException){
+                    System.out.println("TIMEOUT");
+                    //out.writeUTF("TIMEOUT "+fileType+" "+fileName);
+                    out.flush();
+                    fileInputStream.close();
+                    return;
+                }
                 }
                 fileInputStream.close();
 

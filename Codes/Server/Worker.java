@@ -4,6 +4,7 @@ import java.io.*;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.util.HashMap;
+import java.util.Random;
 
 public class Worker extends Thread {
     
@@ -103,13 +104,23 @@ public class Worker extends Thread {
         }
         out.writeUTF(info);
     }
-
+    public long generateChunkSize(){
+        long diff= Server.MAX_CHUNK_SIZE- Server.MIN_CHUNK_SIZE;
+        Random random =  new Random();
+        return Server.MIN_CHUNK_SIZE+Math.abs(random.nextInt()%diff);
+    }
 //    public String[] lookupPrivateFiles(int uID){
 //        File directoryPath = new File("files/"+uID+"/private");
 //        //List of all files and directories
 //        String contents[] = directoryPath.list();
 //        return contents;
 //    }
+    public int generateFileId(String uname, String fileName){
+        String name= uname+"_"+fileName;
+        if(!Server.fileIds.containsKey(name))
+            Server.fileIds.put(name,Server.fileIds.size()+1);
+        return Server.fileIds.get(name);
+    }
     public void run()
     {
         // buffers
@@ -162,75 +173,81 @@ public class Worker extends Thread {
                         String uname= in.readUTF();
                         lookupFiles(uname);
                     }
-                    //-----------receive file-------------out.writeUTF(""+choice);
-                    //                out.writeUTF(fileName);
-                    //                out.writeUTF(""+file.length());------
+                    //-----------receive file-------------
+
                    else if (textFromClient.equals("6")) {
-                        String choice= in.readUTF();
-                        if(choice.equals("1"))choice="public";
-                        else choice="private";
+                        String fileVisibility= in.readUTF();
+                        if(fileVisibility.equals("1"))fileVisibility="public";
+                        else fileVisibility="private";
                         String fileName= in.readUTF();
                         int size= Integer.parseInt(in.readUTF());
-                        System.out.println("User \""+username+"\" wants to upload file \""+fileName+"\" as a "+choice+" file having file length "+size);
-                        // int filesize = Integer.parseInt(tokens.elementAt(1));
-
+                        int fileSize = size;
+                        System.out.println("User \""+username+"\" wants to upload file \""+fileName+"\" as a "+fileVisibility+" file having file length "+size);
+                        if(Server.CUR_BUFFER_SIZE+size<=Server.MAX_BUFFER_SIZE) {
+                            // int filesize = Integer.parseInt(tokens.elementAt(1));
+                            System.out.println("Does not exceed buffer size.\nReceiving file \""+fileName+"\"....");
+                            int chunkSize=(int)generateChunkSize();
+                            int fileId= generateFileId(username,fileName);
+                            out.writeUTF(""+chunkSize);
+                            out.writeUTF(""+fileId);
 //                    String fileType = tokens.elementAt(3);
 //                    int CHUNK_SIZE = Integer.parseInt(tokens.elementAt(4));
 
-                        try {
+                            try {
 //                        connectionSocketFile.setSoTimeout(5000);
 //                        boolean ok = recieveFile(fileName,fileType,filesize,curWorker.getId(),disFile,dosFile,CHUNK_SIZE);
 //                        connectionSocketFile.setSoTimeout(0);
-                            int bytes = 0;
-                            FileOutputStream fileOutputStream = new FileOutputStream("Codes/Server/files/" + username + "/"+choice+"/" + fileName);
+                                int bytes = 0;
+                                FileOutputStream fileOutputStream = new FileOutputStream("Codes/Server/files/" + username + "/" + fileVisibility + "/" + fileName);
 
-                            try { byte[] buffer = new byte[512];
-                                int CHUNK = 0;
-                                // extra
-//                            CUR_BUFFER_SIZE += CHUNK_SIZE;
-                                while (size > 0) {
+                                try {
+                                    byte[] buffer = new byte[chunkSize];
+                                    int CHUNK = 0;
+                                    // extra
+                                    Server.CUR_BUFFER_SIZE += fileSize;
+                                    while (size > 0) {
 
-                                    boolean ok;
-                                    try {
-                                        ok = (bytes = in.read(buffer, 0, Math.min(buffer.length, size))) != -1;
-                                    } catch (SocketTimeoutException socketTimeoutException) {
-//                                    CUR_BUFFER_SIZE -= CHUNK_SIZE;
-                                        fileOutputStream.close();
-                                        System.out.println("FileOutputStream Closed");
+                                        boolean ok;
+                                        try {
+                                            ok = (bytes = in.read(buffer, 0, Math.min(buffer.length, size))) != -1;
+                                        } catch (SocketTimeoutException socketTimeoutException) {
+                                            Server.CUR_BUFFER_SIZE -= fileSize;
+                                            fileOutputStream.close();
+                                            System.out.println("FileOutputStream Closed");
 
-                                    }
+                                        }
 
 //                                if(!ok) break;
 
-                                    if (CHUNK % 10000 == 0) System.out.println("Chunk #" + CHUNK);
-                                    CHUNK++;
+                                        if (CHUNK % 10 == 0) System.out.println("Chunk #" + CHUNK);
+                                        CHUNK++;
 
 //            if(CHUNK != 1) // hardcode to check file size difference
-                                    fileOutputStream.write(buffer, 0, bytes);
+                                        fileOutputStream.write(buffer, 0, bytes);
 
-                                    size -= bytes;      // read upto file size
-                                    // send ACK
+                                        size -= bytes;      // read upto file size
+                                        // send ACK
 //            if(CHUNK <= 1) { // hardcode timeout
-//                                out.writeUTF("ACK");
-//                                out.flush();
+                                out.writeUTF("ACK");
+                                out.flush();
 //            }
 
+                                    }
+
+//                            Server.CUR_BUFFER_SIZE -= chunkSize;
+//                                    fileOutputStream.close();
+//                                    System.out.println("FileOutputStream Closed");
+
+                                } catch (Exception e) {
+                                    System.out.println("Exception ... ");
+//                            CUR_BUFFER_SIZE -= CHUNK_SIZE;
+                                    fileOutputStream.close();
+                                    System.out.println("FileOutputStream Closed");
                                 }
 
-//                            CUR_BUFFER_SIZE -= CHUNK_SIZE;
-                                fileOutputStream.close();
-                                System.out.println("FileOutputStream Closed");
-
-                            } catch (Exception e) {
-                                System.out.println("Exception ... ");
-//                            CUR_BUFFER_SIZE -= CHUNK_SIZE;
-                                fileOutputStream.close();
-                                System.out.println("FileOutputStream Closed");
-                            }
-
-                            // check confirmation and validate file size
-                            String msg = in.readUTF();
-                            if (msg.equals("ACK")) {
+                                // check confirmation and validate file size
+                                String msg = in.readUTF();
+                                if (msg.equals("ACK")) {
 //                            File file = new File("server "+fileName);
 //                            if(file.length() != filesize)
 //                            {
@@ -250,13 +267,13 @@ public class Worker extends Thread {
 //
 //                        if(ok)
 //                        {
-                                out.writeUTF("ACK");
-                                System.out.println("File Upload Completed");
-                                // temporary
+                                    out.writeUTF("ACK");
+                                    System.out.println("File Upload Completed");
+                                    // temporary
 //                                Thread.currentThread().interrupt(); // preserve the message
 //                                socket.close();
 //                                return;
-                            }
+                                }
 //                        else
 //                        {
 //                            File file = new File("files/"+out.getId()+"/"+fileType+"/"+fileName);
@@ -265,17 +282,18 @@ public class Worker extends Thread {
 //                            System.out.println("File Upload Failed");
 //                        }
 
-                        } catch (Exception e) {
+                            } catch (Exception e) {
 //                        File file = new File("files/"+out.getId()+"/"+fileType+"/"+fileName);
 //                        System.out.println(file.delete());
-                            out.writeUTF("File Deleted");
-                            System.err.println("Could not transfer file.");
+                                out.writeUTF("File Deleted");
+                                System.err.println("Could not transfer file.");
+                            }
                         }
 
                     }
                     //-------------- receive file finished
                     else if(textFromClient.equals("7")){
-                        System.out.println("Username: " + username + " is logging out");
+                        System.out.println("User " + username + " is logging out");
                         this.isOnline=false;
                         Thread.currentThread().interrupt(); // preserve the message
                         socket.close();
