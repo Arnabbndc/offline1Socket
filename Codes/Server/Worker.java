@@ -1,8 +1,10 @@
 package Server;
 
+import javax.swing.*;
 import java.io.*;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Random;
 
@@ -12,15 +14,19 @@ public class Worker extends Thread {
     private String username;
     private int fileCnt;
     private Socket socket;
+    private Socket socketFile;
     private DataOutputStream out;
     private DataInputStream in;
+    private DataOutputStream outFile;
+    private DataInputStream inFile;
     private boolean isOnline;
 
 
 
-    public Worker(Socket socket)
+    public Worker(Socket socket, Socket socketFile)
     {
         this.socket = socket;
+        this.socketFile = socketFile;
         workers= Server.getWorkers();
         fileCnt=0;
         isOnline=false;
@@ -123,7 +129,89 @@ public class Worker extends Thread {
             Server.fileIds.put(name,Server.fileIds.size()+1);
         return Server.fileIds.get(name);
     }
-    public static void sendFile( File file, DataInputStream in, DataOutputStream out) throws IOException {
+    public static void receiveFile(String username,int chunkSize,String fileName, int fileSize, String fileVisibility, DataInputStream in, DataOutputStream out, DataInputStream inFile, DataOutputStream outFile) throws IOException {
+
+//                        connectionSocketFile.setSoTimeout(5000);
+//                        boolean ok = recieveFile(fileName,fileType,filesize,curWorker.getId(),disFile,dosFile,CHUNK_SIZE);
+//                        connectionSocketFile.setSoTimeout(0);
+            int bytes = 0, size=fileSize;
+            FileOutputStream fileOutputStream = new FileOutputStream("Codes/Server/files/" + username + "/" + fileVisibility + "/" + fileName);
+
+            try {
+                byte[] buffer = new byte[chunkSize];
+                int CHUNK = 0;
+                // extra
+                Server.CUR_BUFFER_SIZE += chunkSize;
+                while (size > 0) {
+
+                    try {
+                        bytes = inFile.read(buffer, 0, Math.min(buffer.length, size));
+                    } catch (SocketTimeoutException socketTimeoutException) {
+                        Server.CUR_BUFFER_SIZE -= chunkSize;
+                        System.out.println("TIMEOUT!!!");
+                        System.out.println("Uploading Failed");
+                        File file = new File("Codes/Server/files/" + username + "/" + fileVisibility + "/" + fileName);
+                        file.delete();
+                        out.writeUTF("TIMEOUT!!!\nFailed");
+                        out.flush();
+                        fileOutputStream.close();
+                        return;
+
+                    }
+                    if(bytes==-1) break;
+                    if(CHUNK % 1 == 0) System.out.println("Chunk #" + CHUNK+" bytes: "+bytes);
+                    CHUNK++;
+                    fileOutputStream.write(buffer, 0, bytes);
+                    size -= bytes;
+                    out.writeUTF("Acknowledge");
+                    out.flush();
+
+                }
+                Server.CUR_BUFFER_SIZE -= chunkSize;
+                fileOutputStream.close();
+                if(in.readUTF().equals("Completed")){
+                    File file = new File("Codes/Server/files/" + username + "/" + fileVisibility + "/" + fileName);
+                    System.out.println(file.getName());
+                    if(file.length() != fileSize)
+                    {
+                        System.out.println("File size doesn't match "+file.length()+" "+fileSize);
+                        file.delete();
+                        System.out.println("Uploading Failed");
+                        out.writeUTF("Size mismatch!\nFailed");
+                        return;
+                    }
+                    out.writeUTF("Completed");
+                    System.out.println("File Upload Completed");
+                }
+                else
+                {
+                    File file = new File("Codes/Server/files/" + username + "/" + fileVisibility + "/" + fileName);
+
+                    file.delete();
+                    System.out.println("No Acknowledge received from user");
+                    System.out.println("Uploading Failed");
+                    out.writeUTF("No acknowledge received from user!\nFailed");
+                    return;
+                }
+
+            }catch (Exception e)
+            {
+                System.out.println("Exception ... ");
+                e.printStackTrace();
+                Server.CUR_BUFFER_SIZE -= chunkSize;
+                fileOutputStream.close();
+                File file = new File("Codes/Server/files/" + username + "/" + fileVisibility + "/" + fileName);
+
+                file.delete();
+                System.out.println("Uploading Failed");
+                out.writeUTF("Exception!\nFailed");
+                return;
+
+            }
+
+    }
+
+        public static void sendFile( File file, DataInputStream in, DataOutputStream out, DataInputStream inFile, DataOutputStream outFile) throws IOException {
         out.writeUTF(""+Server.MAX_CHUNK_SIZE);
         out.writeUTF(""+file.length());
         FileInputStream fileInputStream = new FileInputStream(file);
@@ -134,8 +222,8 @@ public class Worker extends Thread {
         int bytes = 0;
         byte[] buffer = new byte[Server.MAX_CHUNK_SIZE];
         while ((bytes = fileInputStream.read(buffer)) != -1) {
-            out.write(buffer, 0, bytes);
-            out.flush();
+            outFile.write(buffer, 0, bytes);
+            outFile.flush();
         }
         fileInputStream.close();
         out.writeUTF("Complete");
@@ -149,9 +237,11 @@ public class Worker extends Thread {
         try {
             out = new DataOutputStream(this.socket.getOutputStream());
             in = new DataInputStream(this.socket.getInputStream());
+            outFile= new DataOutputStream(this.socketFile.getOutputStream());
+            inFile = new DataInputStream(this.socketFile.getInputStream());
 
             out.writeUTF("Give your username");
-            String textFromClient = in.readUTF();
+            String textFromClient = in.readUTF(), optionChosen;
             System.out.println("Client username: " + textFromClient);
             String username = textFromClient;
             if (!isLoggedIn(username)) {
@@ -163,6 +253,8 @@ public class Worker extends Thread {
 
                     new File("Codes/Server/files/" + username + "/public").mkdirs();
                     new File("Codes/Server/files/" + username + "/private").mkdirs();
+                    new File("Codes/Server/files/" + username + "/Messages.txt").createNewFile();
+
                 }
 //                else{
 //                    workers.get(username).setOnline(true);
@@ -173,11 +265,23 @@ public class Worker extends Thread {
 //                Date date = new Date();
 //                out.writeObject(date.toString());
                     //  Worker user = new Worker(username, socket);
-
-                    textFromClient = in.readUTF();
-
-                    System.out.println("Option selected by user \""+username+"\": " + textFromClient);
-//
+                    while(true) {
+                        textFromClient = in.readUTF();
+                        String []option= textFromClient.split(" ");
+                        if(option.length==2 && option[0].equals("Option")){
+                            int opt=0;
+                            try {
+                                opt=Integer.parseInt(option[1]);
+                                if(opt>=1 && opt<=7){
+                                    optionChosen=option[1];
+                                    break;
+                                }
+                            }catch (NumberFormatException e){
+                                e.printStackTrace();
+                            }
+                        }
+                    }
+                    System.out.println("Option selected by user \""+username+"\": " + optionChosen);
 //                    StringTokenizer stringTokenizer = new StringTokenizer(textFromClient, " ");
 //                    Vector<String> tokens = new Vector<>();
 //
@@ -185,10 +289,10 @@ public class Worker extends Thread {
 //                        tokens.add(stringTokenizer.nextToken());
 //                    }
 
-                    if(textFromClient.equals("1")) {
+                    if(optionChosen.equals("1")) {
                         sendUserList();
                     }
-                    else if(textFromClient.equals("2")) {
+                    else if(optionChosen.equals("2")) {
                         lookupFiles(this.username);
                         if(in.readUTF().equals("2"))continue;
                         String fileName = in.readUTF();
@@ -202,10 +306,10 @@ public class Worker extends Thread {
                         else{
                             out.writeUTF("Valid file");
                             System.out.println("File "+fileName+" is going to be downloaded by user "+username);
-                            sendFile(file, in, out);
+                            sendFile(file, in, out,inFile,outFile);
                         }
                     }
-                    else if(textFromClient.equals("3")) {
+                    else if(optionChosen.equals("3")) {
                         String uname= in.readUTF();
                         lookupFiles(uname);
                         if(in.readUTF().equals("2"))continue;
@@ -219,130 +323,55 @@ public class Worker extends Thread {
                         else{
                             out.writeUTF("Valid file");
                             System.out.println("File "+fileName+" is going to be downloaded by user "+username);
-                            sendFile(file, in, out);
+                            sendFile(file, in, out, inFile, outFile);
                         }
 
                     }
-                    //-----------receive file-------------
-
-                   else if (textFromClient.equals("6")) {
-                        String fileVisibility= in.readUTF();
-                        if(fileVisibility.equals("1"))fileVisibility="public";
-                        else fileVisibility="private";
-                        String fileName= in.readUTF();
-                        int size= Integer.parseInt(in.readUTF());
-                        int fileSize = size;
-                        System.out.println("User \""+username+"\" wants to upload file \""+fileName+"\" as a "+fileVisibility+" file having file length "+size);
-                        if(Server.CUR_BUFFER_SIZE+size<=Server.MAX_BUFFER_SIZE) {
-                            // int filesize = Integer.parseInt(tokens.elementAt(1));
-                            System.out.println("Does not exceed buffer size.\nReceiving file \""+fileName+"\"....");
-                            int chunkSize=(int)generateChunkSize();
-                            int fileId= generateFileId(username,fileName);
-                            out.writeUTF(""+chunkSize);
-                            out.writeUTF(""+fileId);
-//                    String fileType = tokens.elementAt(3);
-//                    int CHUNK_SIZE = Integer.parseInt(tokens.elementAt(4));
-
-                            try {
-//                        connectionSocketFile.setSoTimeout(5000);
-//                        boolean ok = recieveFile(fileName,fileType,filesize,curWorker.getId(),disFile,dosFile,CHUNK_SIZE);
-//                        connectionSocketFile.setSoTimeout(0);
-                                int bytes = 0;
-                                FileOutputStream fileOutputStream = new FileOutputStream("Codes/Server/files/" + username + "/" + fileVisibility + "/" + fileName);
-
-                                try {
-                                    byte[] buffer = new byte[chunkSize];
-                                    int CHUNK = 0;
-                                    // extra
-                                    Server.CUR_BUFFER_SIZE += fileSize;
-                                    while (size > 0) {
-
-                                        boolean ok;
-                                        try {
-                                            ok = (bytes = in.read(buffer, 0, Math.min(buffer.length, size))) != -1;
-                                        } catch (SocketTimeoutException socketTimeoutException) {
-                                            Server.CUR_BUFFER_SIZE -= fileSize;
-                                            fileOutputStream.close();
-                                            System.out.println("FileOutputStream Closed");
-
-                                        }
-
-//                                if(!ok) break;
-
-                                        if (CHUNK % 10000 == 0) System.out.println("Chunk #" + CHUNK);
-                                        CHUNK++;
-
-//            if(CHUNK != 1) // hardcode to check file size difference
-                                        fileOutputStream.write(buffer, 0, bytes);
-
-                                        size -= bytes;      // read upto file size
-                                        // send ACK
-//            if(CHUNK <= 1) { // hardcode timeout
-                                out.writeUTF("ACK");
-                                out.flush();
-//            }
-
-                                    }
-
-//                            Server.CUR_BUFFER_SIZE -= chunkSize;
-//                                    fileOutputStream.close();
-//                                    System.out.println("FileOutputStream Closed");
-
-                                } catch (Exception e) {
-                                    System.out.println("Exception ... ");
-//                            CUR_BUFFER_SIZE -= CHUNK_SIZE;
-                                    fileOutputStream.close();
-                                    System.out.println("FileOutputStream Closed");
-                                }
-
-                                // check confirmation and validate file size
-                                String msg = in.readUTF();
-                                if (msg.equals("ACK")) {
-//                            File file = new File("server "+fileName);
-//                            if(file.length() != filesize)
-//                            {
-//                                System.out.println("File size mismatch");
-//                                file.delete();
-//                                return false;
-//                            }
-//                        }
-//                        else
-//                        {
-//                            File file = new File("files/"+userID+"/"+fileType+"/"+fileName);
-//                            file.delete();
-//                            return false;
-//                        }
-//
-//                        return true;
-//
-//                        if(ok)
-//                        {
-                                    out.writeUTF("ACK");
-                                    System.out.println("File Upload Completed");
-                                    // temporary
-//                                Thread.currentThread().interrupt(); // preserve the message
-//                                socket.close();
-//                                return;
-                                }
-//                        else
-//                        {
-//                            File file = new File("files/"+out.getId()+"/"+fileType+"/"+fileName);
-//                            System.out.println(file.delete());
-//                            out.writeUTF("NOT_ACK");
-//                            System.out.println("File Upload Failed");
-//                        }
-
-                            } catch (Exception e) {
-//                        File file = new File("files/"+out.getId()+"/"+fileType+"/"+fileName);
-//                        System.out.println(file.delete());
-                                out.writeUTF("File Deleted");
-                                System.err.println("Could not transfer file.");
+                    else if (optionChosen.equals("4")) {
+                        String description = in.readUTF();
+                        String reqId= in.readUTF();
+                        System.out.println("User "+username+" requested a file with description \""+description+"\" and RequestID: "+reqId+"\nBroadcasting it to all users....");
+                        for (String key : workers.keySet()) {
+                            if(!key.equals(username)) {
+                                FileOutputStream fos = new FileOutputStream("Codes/Server/files/" + key + "/Messages.txt", true);
+                                String msg = "FileRequestedBy: "+username+" RequestID: "+reqId+" Description: "+description+"\n";
+                                fos.write(msg.getBytes());
                             }
                         }
 
                     }
+                        //-----------receive file-------------
+
+                   else if (optionChosen.equals("6")) {
+                        String fileVisibility = in.readUTF();
+                        if (fileVisibility.equals("1")) fileVisibility = "public";
+                        else fileVisibility = "private";
+                        String fileName = in.readUTF();
+                        int size = Integer.parseInt(in.readUTF());
+                        int fileSize = size;
+                        System.out.println("User \"" + username + "\" wants to upload file \"" + fileName + "\" as a " + fileVisibility + " file having file length " + size);
+                        if (Server.CUR_BUFFER_SIZE + size <= Server.MAX_BUFFER_SIZE) {
+                            // int filesize = Integer.parseInt(tokens.elementAt(1));
+                            System.out.println("Does not exceed buffer size.\nReceiving file \"" + fileName + "\"....");
+                            int chunkSize = (int) generateChunkSize();
+                            int fileId = generateFileId(username, fileName);
+                            out.writeUTF("" + chunkSize);
+                            out.writeUTF("" + fileId);
+//                    String fileType = tokens.elementAt(3);
+//                    int CHUNK_SIZE = Integer.parseInt(tokens.elementAt(4));
+                            socketFile.setSoTimeout(3000);
+                            try {
+                                receiveFile(username, chunkSize, fileName, fileSize, fileVisibility, in, out, inFile, outFile);
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
+                            socketFile.setSoTimeout(0);
+
+
+                        }
+                    }
                     //-------------- receive file finished
-                    else if(textFromClient.equals("7")){
+                    else if(optionChosen.equals("7")){
                         System.out.println("User " + username + " is logging out");
                         this.isOnline=false;
                         Thread.currentThread().interrupt(); // preserve the message

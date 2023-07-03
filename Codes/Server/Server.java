@@ -12,7 +12,7 @@ public class Server {
 
     public static long MAX_BUFFER_SIZE = 100000 * 1024; // byte
     public static int MIN_CHUNK_SIZE = 5; // kilobyte
-    public static int MAX_CHUNK_SIZE = 500; // kilobyte
+    public static int MAX_CHUNK_SIZE = 50; // kilobyte
     public static volatile long CUR_BUFFER_SIZE = 0;
     private static HashMap<String, Worker> workers= new HashMap<>();
     public static HashMap<String,Worker> getWorkers(){
@@ -21,8 +21,8 @@ public class Server {
     public  static HashMap<String, Integer> fileIds= new HashMap<>();
     public static void main(String[] args) throws IOException, ClassNotFoundException {
 
-            ServerSocket welcomeSocket = new ServerSocket(6667);
-            //  ServerSocket fileWelcomeSocket = new ServerSocket(7777);
+          ServerSocket welcomeSocket = new ServerSocket(6667);
+          ServerSocket welcomeSocketFile = new ServerSocket(7777);
 //        File file= new File("Codes/Server/files");
 //        file.delete();
 //        file.mkdir();
@@ -51,12 +51,13 @@ public class Server {
 
                 System.out.println("Waiting for connection...");
                 Socket socket = welcomeSocket.accept();
+                Socket socketFile = welcomeSocketFile.accept();
                 // Socket fileSocket = fileWelcomeSocket.accept();
 
                 System.out.println("Connection established");
 
                 // open thread
-                Thread worker = new Worker(socket);
+                Thread worker = new Worker(socket, socketFile);
                 //       Thread fileWorker= new FileWorker(socket, fileSocket);
                 worker.start();
 
