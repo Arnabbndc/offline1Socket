@@ -5,14 +5,12 @@ import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.util.*;
 
-import Server.Pair;
-import Server.Server;
 
 public class Client {
     public static String generateRequestId(String uname, String description, HashMap<String, String> reqIds){
         String name= uname+"_"+description;
         if(!reqIds.containsKey(name))
-            reqIds.put(name,uname+"_"+reqIds.size()+1);
+            reqIds.put(name,uname+"_"+(reqIds.size()+1));
         return reqIds.get(name);
     }
     public static void sendFile(File file,int chunkSize, DataInputStream in, DataOutputStream out, DataInputStream inFile, DataOutputStream outFile) throws IOException {
@@ -21,17 +19,10 @@ public class Client {
         out.flush();
         int bytes = 0;
         byte[] buffer = new byte[chunkSize];
-        int CHUNK = 0;
         while ((bytes = fileInputStream.read(buffer)) != -1) {
-// Laage na
-            if(CHUNK % 1 == 0) System.out.println("Chunk #"+CHUNK+" bytes: "+bytes);
-            CHUNK++;
-
             outFile.write(buffer, 0, bytes);
             outFile.flush();
-
             try {
-                // Acknowledge
                 String msg = in.readUTF();
                 if(!msg.equals("Acknowledge"))
                 {
@@ -41,7 +32,6 @@ public class Client {
 
             }catch (SocketTimeoutException socketTimeoutException){
                 System.out.println("TIMEOUT");
-                //out.writeUTF("TIMEOUT "+fileType+" "+fileName);
                 out.flush();
                 fileInputStream.close();
                 return;
@@ -49,8 +39,6 @@ public class Client {
 
         }
         fileInputStream.close();
-
-        // send confirmation
         out.writeUTF("Completed");
         String msg = in.readUTF();
         if (msg.equals("Completed")) {
@@ -80,7 +68,7 @@ public class Client {
 
     }
 
-    public static void main(String[] args) throws IOException, ClassNotFoundException {
+    public static void main(String[] args) throws IOException {
         HashMap<String, String> reqIds= new HashMap<>();
         Socket socket = new Socket("localhost", 6667);
         Socket socketFile= new Socket("localhost", 7777);
@@ -89,12 +77,10 @@ public class Client {
         System.out.println("Local port: " + socket.getLocalPort());
         System.out.println("Remote port for file: " + socketFile.getPort());
         System.out.println("Local port for file: " + socketFile.getLocalPort());
-        // buffers
         DataOutputStream out = new DataOutputStream(socket.getOutputStream());
         DataInputStream in = new DataInputStream(socket.getInputStream());
         DataOutputStream outFile = new DataOutputStream(socketFile.getOutputStream());
         DataInputStream inFile = new DataInputStream(socketFile.getInputStream());
-
         String textFromServer =  in.readUTF();
         System.out.println("Text from server: "+textFromServer);
         Scanner scanner= new Scanner(System.in);
@@ -110,22 +96,8 @@ public class Client {
         new File("Codes/Client/Downloads/"+username).mkdirs();
 
         
-        //
+
         while(true) {
-//            String msg = (String) in.readObject();
-//            System.out.println(msg);
-    //        textFromServer =  in.readUTF();
-     //       System.out.println("Text from server: "+textFromServer);
-//            scanner= new Scanner(System.in);
-//            String username= scanner.next();
-//            out.writeUTF(""+username);
-//            textFromServer =  in.readUTF();
-//            System.out.println("Text from server: "+textFromServer);
-//            if(textFromServer.equals("You are already logged in")){
-//                System.out.println("login failed. Quitting");
-//                socket.close();
-//                return;
-//            }
             System.out.println("Console ...");
             System.out.println("Choose an option between 1-7");
             System.out.println("1. Lookup all clients");
@@ -136,10 +108,9 @@ public class Client {
             System.out.println("6. File upload");
             System.out.println("7. Logout");
             int option = scanner.nextInt();
-            if(option<=4 || option==7)
+            if(option<=5 || option==7)
                 out.writeUTF("Option "+option);
-            if(option<3){
-                //List<Pair> clients =(List<Pair>) in.;
+            if(option<3|| option==5){
                 String info= in.readUTF();
                 System.out.println("From Server....\n"+info);
                 if(option==2){
@@ -156,6 +127,42 @@ public class Client {
                     }
                     System.out.println("File "+fileName+" download starts..");
                     receiveFile(username, fileName,in, out, inFile, outFile);
+                }
+                if(option==5){
+                    System.out.println("Want to upload a requested file?\n1. Yes\n2. No");
+                    int decision= scanner.nextInt();
+                    if(decision==1){
+                        System.out.println("Enter RequestID:");
+                        String reqId= scanner.next();
+                        System.out.println("Enter File Name:");
+                        String fileName= scanner.next();
+                        File file = new File("Codes/Client/files/"+fileName);
+                        if(!file.exists()){
+                            System.out.println("File \""+fileName+"\" does not exist");
+                            out.writeUTF("Done");
+                            continue;
+                        }
+                        out.writeUTF("Uploading");
+                        out.writeUTF(reqId);
+                        out.writeUTF(fileName);
+                        out.writeUTF(""+file.length());
+                        System.out.println("fileName " + fileName + " " + file.length());
+                        textFromServer= in.readUTF();
+                        if(textFromServer.equals("Not Ok")){
+                            System.out.println("file can't be uploaded for buffer size issue");
+                            return;
+                        }
+                        int chunkSize= Integer.parseInt(textFromServer);
+                        int fileId = Integer.parseInt(in.readUTF());
+                        System.out.println("From server-- Chunk size: "+chunkSize+" FileId: "+fileId);
+                        socketFile.setSoTimeout(30000);
+                        sendFile(file,chunkSize,in,out, inFile, outFile);
+                        socketFile.setSoTimeout(0);
+
+                    }
+                    else{
+                        out.writeUTF("Done");
+                    }
                 }
             }
             else if(option==3){
@@ -187,12 +194,9 @@ public class Client {
                 out.flush();
                 out.writeUTF(reqId);
             }
-            //sending file
             else if(option==6) {
                 System.out.println("Enter File Name:");
-                String fileName;
-                fileName= scanner.next();
-//                fileName= "abcd.txt";//temporary
+                String fileName= scanner.next();
                 File file = new File("Codes/Client/files/"+fileName);
                 if(!file.exists()){
                     System.out.println("File \""+fileName+"\" does not exist");
@@ -213,7 +217,9 @@ public class Client {
                 int chunkSize= Integer.parseInt(textFromServer);
                 int fileId = Integer.parseInt(in.readUTF());
                 System.out.println("From server-- Chunk size: "+chunkSize+" FileId: "+fileId);
+                socketFile.setSoTimeout(30000);
                 sendFile(file,chunkSize,in,out, inFile, outFile);
+                socketFile.setSoTimeout(0);
 
             }
             else if(option==7){

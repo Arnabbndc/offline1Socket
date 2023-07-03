@@ -1,10 +1,7 @@
 package Server;
-
-import javax.swing.*;
 import java.io.*;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
-import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Random;
 
@@ -12,7 +9,6 @@ public class Worker extends Thread {
     
     public HashMap<String, Worker> workers;
     private String username;
-    private int fileCnt;
     private Socket socket;
     private Socket socketFile;
     private DataOutputStream out;
@@ -20,23 +16,14 @@ public class Worker extends Thread {
     private DataOutputStream outFile;
     private DataInputStream inFile;
     private boolean isOnline;
-
-
-
     public Worker(Socket socket, Socket socketFile)
     {
         this.socket = socket;
         this.socketFile = socketFile;
         workers= Server.getWorkers();
-        fileCnt=0;
         isOnline=false;
     }
-    public DataOutputStream getDataOutputStream(){
-        return out;
-    }
-    public DataInputStream getDataInputStream(){
-        return in;
-    }
+
 
     public String getUsername() {
         return username;
@@ -45,34 +32,9 @@ public class Worker extends Thread {
     public boolean isOnline() {
         return isOnline;
     }
-    public void setOnline(boolean status){
-        isOnline=status;
-    }
-    public void setWorkers(HashMap<String, Worker> workers) {
-        this.workers = workers;
-    }
 
-    public void setUsername(String username) {
-        this.username = username;
-    }
-
-    public void setFileCnt(int fileCnt) {
-        this.fileCnt = fileCnt;
-    }
-
-    public void setSocket(Socket socket) {
-        this.socket = socket;
-    }
-
-    public void setOut(DataOutputStream out) {
-        this.out = out;
-    }
-
-    public void setIn(DataInputStream in) {
-        this.in = in;
-    }
     boolean isLoggedIn(String uname){
-        if(workers.containsKey(uname)&& workers.get(uname).isOnline() ) return true;
+        if(workers.containsKey(uname) && workers.get(uname).isOnline() ) return true;
         return false;
     }
     boolean isPreviousUser(String uname){
@@ -117,30 +79,18 @@ public class Worker extends Thread {
         Random random =  new Random();
         return Server.MIN_CHUNK_SIZE+Math.abs(random.nextInt()%diff);
     }
-//    public String[] lookupPrivateFiles(int uID){
-//        File directoryPath = new File("files/"+uID+"/private");
-//        //List of all files and directories
-//        String contents[] = directoryPath.list();
-//        return contents;
-//    }
     public int generateFileId(String uname, String fileName){
         String name= uname+"_"+fileName;
         if(!Server.fileIds.containsKey(name))
-            Server.fileIds.put(name,Server.fileIds.size()+1);
+            Server.fileIds.put(name,(Server.fileIds.size()+1));
         return Server.fileIds.get(name);
     }
-    public static void receiveFile(String username,int chunkSize,String fileName, int fileSize, String fileVisibility, DataInputStream in, DataOutputStream out, DataInputStream inFile, DataOutputStream outFile) throws IOException {
-
-//                        connectionSocketFile.setSoTimeout(5000);
-//                        boolean ok = recieveFile(fileName,fileType,filesize,curWorker.getId(),disFile,dosFile,CHUNK_SIZE);
-//                        connectionSocketFile.setSoTimeout(0);
-            int bytes = 0, size=fileSize;
+    public static boolean receiveFile(String username,int chunkSize,String fileName, int fileSize, String fileVisibility, DataInputStream in, DataOutputStream out, DataInputStream inFile, DataOutputStream outFile) throws IOException {
+         int bytes = 0, size=fileSize;
             FileOutputStream fileOutputStream = new FileOutputStream("Codes/Server/files/" + username + "/" + fileVisibility + "/" + fileName);
 
             try {
                 byte[] buffer = new byte[chunkSize];
-                int CHUNK = 0;
-                // extra
                 Server.CUR_BUFFER_SIZE += chunkSize;
                 while (size > 0) {
 
@@ -155,12 +105,10 @@ public class Worker extends Thread {
                         out.writeUTF("TIMEOUT!!!\nFailed");
                         out.flush();
                         fileOutputStream.close();
-                        return;
+                        return false;
 
                     }
                     if(bytes==-1) break;
-                    if(CHUNK % 1 == 0) System.out.println("Chunk #" + CHUNK+" bytes: "+bytes);
-                    CHUNK++;
                     fileOutputStream.write(buffer, 0, bytes);
                     size -= bytes;
                     out.writeUTF("Acknowledge");
@@ -171,17 +119,17 @@ public class Worker extends Thread {
                 fileOutputStream.close();
                 if(in.readUTF().equals("Completed")){
                     File file = new File("Codes/Server/files/" + username + "/" + fileVisibility + "/" + fileName);
-                    System.out.println(file.getName());
                     if(file.length() != fileSize)
                     {
                         System.out.println("File size doesn't match "+file.length()+" "+fileSize);
                         file.delete();
                         System.out.println("Uploading Failed");
                         out.writeUTF("Size mismatch!\nFailed");
-                        return;
+                        return false;
                     }
                     out.writeUTF("Completed");
                     System.out.println("File Upload Completed");
+                    return true;
                 }
                 else
                 {
@@ -191,7 +139,7 @@ public class Worker extends Thread {
                     System.out.println("No Acknowledge received from user");
                     System.out.println("Uploading Failed");
                     out.writeUTF("No acknowledge received from user!\nFailed");
-                    return;
+                    return false;
                 }
 
             }catch (Exception e)
@@ -205,7 +153,7 @@ public class Worker extends Thread {
                 file.delete();
                 System.out.println("Uploading Failed");
                 out.writeUTF("Exception!\nFailed");
-                return;
+                return false;
 
             }
 
@@ -233,7 +181,6 @@ public class Worker extends Thread {
     }
     public void run()
     {
-        // buffers
         try {
             out = new DataOutputStream(this.socket.getOutputStream());
             in = new DataInputStream(this.socket.getInputStream());
@@ -256,15 +203,8 @@ public class Worker extends Thread {
                     new File("Codes/Server/files/" + username + "/Messages.txt").createNewFile();
 
                 }
-//                else{
-//                    workers.get(username).setOnline(true);
-//                }
                 workers.put(username, this);
                 while (true) {
-                    Thread.sleep(1);
-//                Date date = new Date();
-//                out.writeObject(date.toString());
-                    //  Worker user = new Worker(username, socket);
                     while(true) {
                         textFromClient = in.readUTF();
                         String []option= textFromClient.split(" ");
@@ -282,13 +222,6 @@ public class Worker extends Thread {
                         }
                     }
                     System.out.println("Option selected by user \""+username+"\": " + optionChosen);
-//                    StringTokenizer stringTokenizer = new StringTokenizer(textFromClient, " ");
-//                    Vector<String> tokens = new Vector<>();
-//
-//                    while (stringTokenizer.hasMoreTokens()) {
-//                        tokens.add(stringTokenizer.nextToken());
-//                    }
-
                     if(optionChosen.equals("1")) {
                         sendUserList();
                     }
@@ -330,6 +263,7 @@ public class Worker extends Thread {
                     else if (optionChosen.equals("4")) {
                         String description = in.readUTF();
                         String reqId= in.readUTF();
+                        Server.reqIds.put(reqId,username);
                         System.out.println("User "+username+" requested a file with description \""+description+"\" and RequestID: "+reqId+"\nBroadcasting it to all users....");
                         for (String key : workers.keySet()) {
                             if(!key.equals(username)) {
@@ -340,8 +274,44 @@ public class Worker extends Thread {
                         }
 
                     }
-                        //-----------receive file-------------
+                    else if(optionChosen.equals("5")){
+                        FileInputStream fis= new FileInputStream("Codes/Server/files/" + username + "/Messages.txt");
+                        out.writeUTF("Unread Messages:\n"+ new String(fis.readAllBytes()));
+                        System.out.println("All unread messages sent to user "+username);
+                        FileOutputStream fos = new FileOutputStream("Codes/Server/files/" + username + "/Messages.txt");
+                        if(in.readUTF().equals("Uploading")){
+                            String reqId= in.readUTF();
+                            String fileName= in.readUTF();
+                            int fileSize= Integer.parseInt(in.readUTF());
+                            if (Server.CUR_BUFFER_SIZE + fileSize <= Server.MAX_BUFFER_SIZE) {
+                                System.out.println("User "+username+" is uploading file "+fileName+" in response to RequestID "+reqId);
+                                System.out.println("Does not exceed buffer size.\nReceiving file \"" + fileName + "\"....");
+                                int chunkSize = (int) generateChunkSize();
+                                int fileId = generateFileId(username, fileName);
+                                out.writeUTF("" + chunkSize);
+                                out.writeUTF("" + fileId);
+                                socketFile.setSoTimeout(30000);
+                                try {
+                                    if(receiveFile(username, chunkSize, fileName, fileSize, "public", in, out, inFile, outFile)){
+                                        String reqUser= Server.reqIds.get(reqId);
+                                        System.out.println("Sending message to user "+reqUser+" who requested this file with reqID: "+reqId);
+                                        fos = new FileOutputStream("Codes/Server/files/" + reqUser + "/Messages.txt", true);
+                                        String msg = "UploadedFile: "+fileName+" by user "+ username+" on RequestID: "+reqId+"\n";
+                                        fos.write(msg.getBytes());
+                                    }
+                                } catch (IOException e) {
+                                    e.printStackTrace();
+                                }
+                                socketFile.setSoTimeout(0);
 
+
+                            }
+                            else{
+                                System.out.println("Buffer size exceeded");
+                                out.writeUTF("Not Ok");
+                            }
+                        }
+                    }
                    else if (optionChosen.equals("6")) {
                         String fileVisibility = in.readUTF();
                         if (fileVisibility.equals("1")) fileVisibility = "public";
@@ -351,15 +321,12 @@ public class Worker extends Thread {
                         int fileSize = size;
                         System.out.println("User \"" + username + "\" wants to upload file \"" + fileName + "\" as a " + fileVisibility + " file having file length " + size);
                         if (Server.CUR_BUFFER_SIZE + size <= Server.MAX_BUFFER_SIZE) {
-                            // int filesize = Integer.parseInt(tokens.elementAt(1));
                             System.out.println("Does not exceed buffer size.\nReceiving file \"" + fileName + "\"....");
                             int chunkSize = (int) generateChunkSize();
                             int fileId = generateFileId(username, fileName);
                             out.writeUTF("" + chunkSize);
                             out.writeUTF("" + fileId);
-//                    String fileType = tokens.elementAt(3);
-//                    int CHUNK_SIZE = Integer.parseInt(tokens.elementAt(4));
-                            socketFile.setSoTimeout(3000);
+                            socketFile.setSoTimeout(30000);
                             try {
                                 receiveFile(username, chunkSize, fileName, fileSize, fileVisibility, in, out, inFile, outFile);
                             } catch (IOException e) {
@@ -369,12 +336,15 @@ public class Worker extends Thread {
 
 
                         }
+                        else{
+                            System.out.println("Buffer size exceeded");
+                            out.writeUTF("Not Ok");
+                        }
                     }
-                    //-------------- receive file finished
                     else if(optionChosen.equals("7")){
                         System.out.println("User " + username + " is logging out");
                         this.isOnline=false;
-                        Thread.currentThread().interrupt(); // preserve the message
+                        Thread.currentThread().interrupt();
                         socket.close();
                         return;
                     }
@@ -383,13 +353,13 @@ public class Worker extends Thread {
             } else {
                 out.writeUTF("You are already logged in");
                 System.out.println("Username: " + username + " login failed since already logged in");
-                Thread.currentThread().interrupt(); // preserve the message
+                Thread.currentThread().interrupt();
                 socket.close();
                 return;
             }
         }
 
-            catch (IOException | InterruptedException e) {
+            catch (IOException  e) {
             e.printStackTrace();
         }
     }
